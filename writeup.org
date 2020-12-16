@@ -1,0 +1,208 @@
+* FPL Team Generator
+** TLDR
+   I wrote an FPL team generator using linear programming and a
+   team/player prediction algorithm. Its suggestion for the optimal team
+   from gw18-gw28 is:
+
+   Pope \\
+   Cancelo - Dias - Walker-Peters - Bednarek \\
+   De Bruyne - Fernandes - Rashford - Grealish - El Ghazi \\
+   Martial
+
+   Subs: \\
+   Rodrigo - Brewster - Hause
+
+   (Starters and subs would change depending on fixtures)
+
+   [[https://github.com/dghosef/FPL-team-generator][Github repo here]]
+** Intro
+
+   Hi all! This is my third season of FPL and ever since I was
+   introduced to the game, I've wanted to take a shot at writing an
+   algorithm for the game.  This year, thanks to COVID, my
+   university(I'm a computer science student) has given us an
+   abnormally long break. This, coupled with the fact that I can't
+   really go anywhere(also thanks to COVID) gave me a perfect
+   opportunity to do just that. After a lot of tinkering, I'm at the
+   point where I'm happy enough with the algorithm's output for me to
+   share it. I decided to call it FPL Teach because I liked the ring
+   of it(although the name is a bit misleading since there is no
+   machine learning involved whatsoever). First, credit where credit
+   is due
+
+   - [[https://www.reddit.com/r/FantasyPL/comments/dg1to7/an_analysis_of_overanalysis_my_adventure_in_fpl][This project by u/blubbersassafras greatly inspired my algorithm]]
+   - [[https://medium.com/@joseph.m.oconnor.88/linearly-optimising-fantasy-premier-league-teams-3b76e9694877][Excellent guide for linear programming with Python/PuLP for FPL]] 
+   - [[https://medium.com/@conalldalydev/how-to-get-fantasy-premier-league-data-using-python-f99f50ab0da][Tutorial for accessing the FPL API with python]]
+
+     Warning: The rest of this post constains a lot of technical
+     details. For those who want to skip it, I don't blame you
+
+     Also, I don't have much of a math/stats background, so forgive me if
+     there are painfully obvious ways to improve this algorithm that I
+     didn't think of.
+
+** Algorithm overview
+
+   My FPL algorithm consists of 2 main parts - predicting individual
+   player performances, and then from that, forming a team. I'll start
+   with the forming a team part since, in my opinion, it is the simpler
+   than predicting player performances.
+
+**** Team selection
+
+     The idea of the team generation algorithm is simple: pick the
+     team that maximizes predicted points(see next section) given the
+     constraints of FPL(11 starters, 3 subs, max of 3 players per
+     team, budget, etc). Thankfully, python has a very convenient
+     package called [[https://pypi.org/project/PuLP/][PuLP]] that makes solving problems like these a
+     breeze. Essentially, all I had to do was input the constraints
+     and predicted points and the package would spit out the optimal
+     team(see the above link about PuLP for more details). To pick the
+     initial team, I inputted all of the FPL constraints into a PuLP
+     model along with each player's total predicted points over the
+     next 10 gameweeks. In order to take into account the fact that
+     subs don't play all that much and captains get double points, I
+     got the model to pick an overall starting XI, 3 subs, and 2
+     captains for the next 10 weeks with the assumptions that the
+     first, second, and third subs play 20%, 10%, and 5% of the time
+     and each captain gets 1.5x their original predicted points. The
+     sub percents and number of captains were all picked somewhat
+     arbitrarily/by experimentation and intuition rather than having
+     any real statistical basis, something that could be improved in
+     the future. To pick the starting XI for any given gameweek, the
+     algorithm will pick the starting 11 that maximizes predicted
+     points for that gameweek and then orders the subs from highest
+     predicted points to the lowest. The transfer process is quite
+     similar to the team selection process. The only difference is I
+     added the constraint that the new team must have only 1 different
+     player than the original team(this can be altered to 2 players, 3
+     players, etc). 
+
+**** Player Points Prediction
+
+     The general process for player point prediction is:
+
+     1. Calculate each team's relative attacking and defensive strength and from that predict the score
+     2. Calculate how involved the player is for their team's assists and goals as a percentage
+     3. From those two, predict the number of goals/assists of the player
+     4. If the player is a gk, def, or mid, calculate probability of keeping a cs from predicted score
+     5. If the player is a gk or def, calculate the probability of losing points from conceeding
+     6. If the player is a gk, try to predict number of saves
+     7. Calculate points from predicted goals, assists, etc using point values
+     8. From the above data, try to predict bonus points and add to point count
+        
+     The basic idea behind finding relative strengths is to first
+     assume every team is equally strong. We loop through each game
+     and calculate a defensive and attacking score for each team in
+     each game where a lower defensive score and a higher attacking
+     score is better. For example, a defensive score of 0.5 means the
+     defense is twice as good as the average defense. An attacking
+     score of 2 means the attack is twice as good as average After
+     this, average each team's attacking/defensive scores and repeat
+     the process, but this time, take into account opponent's
+     attacking and defensive strengths while finding each team's
+     strengths for each game. Here is some python-pseudocode for more
+     detail.
+
+     #+BEGIN_SRC python
+       def team_strengths():
+            team_list = ['ARS', 'SOU', 'WBA', ...]
+            # Past scores in the form:
+            # {Team: [(Opposition1, Team goals, Opposition goals), ...] ... }
+            scores = {'ARS': [('CRY', 2, 0), ('SOU', 1, 3), ('BUR', 1, 0), ...],
+                      'CRY': [('ARS', 0, 2), ('MUN', 3, 3), ('WBA', 4, 0) ...]
+                      ...}
+            # Initialize attacking and defensive strengths to 1 for each team
+            d_strengths = {'ARS': 1, 'BUR': 1, 'SOU': 1 ...}
+            a_strengths = {'ARS': 1, 'BUR': 1, 'SOU': 1 ...}
+            avg_goals = 1.36 # epl average goals/team/game
+            num_iterations = 50
+            for i in range(num_iterations): # Update strengths num_iterations times
+                 # The new strengths calculated from this iteration
+                 new_d_strengths = dict()
+                 new_a_strengths = dict()
+                 # find strengths for each team
+                 for current_team in team_list:
+                      current_team_d_strengths = list()
+                      current_team_a_strengths = list()
+                      for score in scores[current_team]:
+                           opposition = score[0] # opposition team
+                           goals_for = score[1] # current_team goals scored
+                           goals_against = score[2] # current_team goals conceeded
+                           opposition_d_strength = d_strengths[opposition][0]
+                           opposition_a_strength = a_strengths[opposition][0]
+                           # Find defensive strength from this game. Lower is better
+                           current_team_d_strengths.append(goals_against / avg_scored / opp_a_strength)
+                           # Find attacking strength from this game. Higher is better
+                           current_team_a_strengths.append(goals_for / avg_scored / opp_d_strength)
+                      # Average the newly calculated strengths to find the team's
+                      # overall strength
+                      new_d_strengths[current_team] = average(current_team_d_strengths)
+                      new_a_strengths[current_team] = average(current_team_a_strengths)
+                 # If we haven't completed num_iterations, redo the process
+                 # newly calculated team strengths
+                 a_strengths = new_a_strengths
+                 d_strengths = new_d_strengths
+     #+END_SRC
+     
+     The initial idea was that attacking and defensive strengths would
+     converge to a number after enough iterations. In reality, they
+     often alternated between 2-4 values. As a result, the final
+     algorithm calculates team strengths for 54 iterations and uses
+     the average of the last 4. It is possible that a higher iteration
+     count would have lead to a convergence, but I'm not sure how long
+     that would take and the average is likely very close to the
+     actual value. In my actual implementation, I max out the
+     defensive and offensive strength of each game to be 3 so as to
+     remove the impact of outliers like WBA scoring against Man City
+     who hadn't conceeded in a month and the 7-2 AVL-LIV game. Also,
+     in my implementation, the past 10 gameweeks are considered where
+     the 5 most recent fixtures are weighted twice as heavily as the
+     other 5 fixtures. See [[https://github.com/dghosef/FPL-team-generator/blob/main/src/predict_points.py][src/predict_points.py]] for the actual
+     implementation. Once we have each team's strength, we can predict
+     any score. The formula is
+
+     (team1 goals, team2 goals) = (avg_goals * team1_a_strength * team2_d_strength, avg_goals * team2_a_strength * team2_d_strength)
+     
+     The rest of point prediction is fairly straightforward. As many
+     of you know, FPL provides their own custom statistics titled
+     creativity and threat, where 100 creativity roughly corresponds
+     to 1 assist and 100 threat roughly corresponds to 1 goal. In
+     order to calculate the number of goals a player is going to
+     score, we calculate that player's threat per minute(tpm) and
+     their team's overall threat per minute. Then we figure out the expected
+     goals their team is going to score in a game and apply the formula
+
+     expected goals = (player_tpm/team_tpm) * expected_goals
+
+     We do the same process to figure out assists but with creativity
+     per minute(cpm) so that
+
+     expected assists = (player_cpm/team_cpm) * expected_goals * .80
+     
+     I multiply by .75 because I'd estimate roughly 25% of goals don't
+     have an assist. 
+     
+     I won't go into too much detail for the rest of the steps, but
+     here is a quick overview of the highlights
+     - We can use the poisson distribution formula to get probability of cleansheet = e^(-predicted goals conceeded)
+     - The poisson distribution formula is also used to find probability of opposition scoring 2+ goals
+     - Goalkeeper save count is predicted by looking at their saves/opposition attacking strength/game and then multiplying by new opposition attacking strength
+     - Bonus points are calculated by dividing the number of bps of a player(found using the [[https://www.premierleague.com/news/106533][official bps formula and the previously calculated stats]]) by 16
+       - I chose 16 because the average number of predicted bonus points when I use 16 is quite close to the real life average
+     - Points are found using multiplication. 2 points are added for playing time
+       - For example, if Ings, has 1.2 predicted goals and 0.23 predicted assists, his point value is 1.2*4 + .23*3 + 2
+     - Players who have played less than 240 mins over the last 4 games have their point value overriden to 0
+     - Players who are marked as 25%, 50%, and 75% have their point values multiplied accordingly(see the [[https://github.com/dghosef/FPL-team-generator/blob/main/src/pick_team.py][get_data function]])
+     Again, this approach was heavily borrowed from u/blubbersassafras's method. 
+
+**** Limitations/things to be improved
+     - Currently the algorithm can't determine how many transfers to make
+     - Players' creativities and threats amounts are compared to their team's overall levels rather than just the games they played
+     - The bonus point algorithm doesn't account for bps magnets/repellants
+     - Calculate what percent of each individual team's goals have an assist for more accurate assist predictions
+     - Probably a lot more that I meant to remember but forgot
+       
+I left out a number of details because this post is already sort of
+long, but feel free to check out the [[https://github.com/dghosef/FPL-team-generator/blob/main/src/pick_team.py][github]] and leave any
+suggestions/feedback either there or in the comments
