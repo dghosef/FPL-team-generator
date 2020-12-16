@@ -35,6 +35,9 @@ def team_strengths(gameweeks, weights=None, refresh_data=False,
     # By default, weigh each gameweek equally
     if weights is None:
         weights = [1] * len(gameweeks)
+    else:
+        # Make sure weights is the right size
+        weights = weights[-len(gameweeks):]
     # Start each team with [offensive strength, defensive_strength] = [1, 1]
     strengths = dict(zip(get_team_numbers().values(), [[1, 1]] * 20))
     # The dict that will be returned which will be populated by the average
@@ -147,12 +150,12 @@ def performance_predictions(past_gameweeks, future_gameweeks, strengths,
         total_minutes = sum([i for i in history[player]['gw_history'][0]])
         # To avoid divide by 0 errors
         if total_minutes == 0:
-            goals = [0]
-            assists = [0]
-            cleansheets = [0]
-            conceed_2 = [0]
-            points = [0]
-            saves = [0] * 38
+            goals = [0] * len(future_gameweeks)
+            assists = [0] * len(future_gameweeks)
+            cleansheets = [0] * len(future_gameweeks)
+            conceed_2 = [0] * len(future_gameweeks)
+            points = [0] * len(future_gameweeks)
+            saves = [0] * len(future_gameweeks)
         else:
             total_creativity = \
                 sum([i for i in history[player]['gw_history'][1]])
@@ -195,7 +198,6 @@ def performance_predictions(past_gameweeks, future_gameweeks, strengths,
 
 
 if __name__ == "__main__":
-    from pprint import pprint
     strengths = team_strengths([11, 12, 13, 14, 15])
     past_fixtures = get_past_fixtures(15)
     future_fixtures = get_future_fixtures(range(19, 30))

@@ -51,3 +51,6 @@ class Player():
 
     def __repr__(self):
         return f"{self.name}({self.team})({self.position})"
+
+    def __lt__(self, other):
+        return self.name < other.name

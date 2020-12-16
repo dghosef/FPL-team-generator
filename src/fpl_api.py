@@ -94,6 +94,7 @@ def get_player_history(gameweeks, refresh_data=False):
         player_name = players_df.web_name[player_index]
         player_team = teams[players_df.team[player_index]]
         position = players_df.element_type[player_index]
+        selected_by = float(players_df.selected_by_percent[player_index])
         current_player = Player(player_name, position, player_team)
         # API multiplies actual cost by 10
         price = players_df.now_cost[player_index] / 10.0
@@ -106,6 +107,7 @@ def get_player_history(gameweeks, refresh_data=False):
         players_dict[current_player]['status'] = status
         players_dict[current_player]['gw_history'] = \
             gameweek_dict[player_id] if player_id in gameweek_dict else list()
+        players_dict[current_player]['selected_by'] = selected_by
     return players_dict
 
 
