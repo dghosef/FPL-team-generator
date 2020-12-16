@@ -1,8 +1,6 @@
-* FPL Team Generator
+* FPL Teach - My FPL Team Generator
 ** TLDR
-   I wrote an FPL team generator using linear programming and a
-   team/player prediction algorithm. Its suggestion for the optimal team
-   from gw18-gw28 is:
+   I wrote an FPL team generator. Its suggestion for the optimal team from gw18-gw28 is:
 
    - Pope
    - Cancelo - Dias - Walker-Peters - Bednarek
@@ -18,16 +16,14 @@
 ** Intro
 
    Hi all! This is my third season of FPL and ever since I was
-   introduced to the game, I've wanted to take a shot at writing an
-   algorithm for the game.  This year, thanks to COVID, my
+   introduced to the game, I've been meaning to try my hand at writing
+   an automated team picker. This year, thanks to COVID, my
    university(I'm a computer science student) has given us an
    abnormally long break. This, coupled with the fact that I can't
-   really go anywhere(also thanks to COVID) gave me a perfect
+   really go anywhere(also thanks to COVID) has given me a perfect
    opportunity to do just that. After a lot of tinkering, I'm at the
    point where I'm happy enough with the algorithm's output for me to
-   share it. I decided to call it FPL Teach because I liked the ring
-   of it(although the name is a bit misleading since there is no
-   machine learning involved whatsoever). First, credit where credit
+   share it, though it's far from perfect. First, credit where credit
    is due
 
    - [[https://www.reddit.com/r/FantasyPL/comments/dg1to7/an_analysis_of_overanalysis_my_adventure_in_fpl][This project by u/blubbersassafras greatly inspired my algorithm]]
@@ -35,50 +31,15 @@
    - [[https://medium.com/@conalldalydev/how-to-get-fantasy-premier-league-data-using-python-f99f50ab0da][Tutorial for accessing the FPL API with python]]
 
      Warning: The rest of this post constains a lot of technical
-     details. For those who want to skip it, I don't blame you
+     details. I don't blame you if you want to skip the rest
 
      Also, I don't have much of a math/stats background, so forgive me if
-     there are painfully obvious ways to improve this algorithm that I
-     didn't think of.
+     you notice any mistakes.
 
 ** Algorithm overview
-
-   My FPL algorithm consists of 2 main parts - predicting individual
-   player performances, and then from that, forming a team. I'll start
-   with the forming a team part since, in my opinion, it is the simpler
-   than predicting player performances.
-
-**** Team selection
-
-     The idea of the team generation algorithm is simple: pick the
-     team that maximizes predicted points(see next section) given the
-     constraints of FPL(11 starters, 3 subs, max of 3 players per
-     team, budget, etc). Thankfully, python has a very convenient
-     package called [[https://pypi.org/project/PuLP/][PuLP]] that makes solving problems like these a
-     breeze. Essentially, all I had to do was input the constraints
-     and predicted points and the package would spit out the optimal
-     team(see the above link about PuLP for more details). To pick the
-     initial team, I inputted all of the FPL constraints into a PuLP
-     model along with each player's total predicted points over the
-     next 10 gameweeks. In order to take into account the fact that
-     subs don't play all that much and captains get double points, I
-     got the model to pick an overall starting XI, 3 subs, and 2
-     captains for the next 10 weeks with the assumptions that the
-     first, second, and third subs play 20%, 10%, and 5% of the time
-     and each captain gets 1.5x their original predicted points. The
-     sub percents and number of captains were all picked somewhat
-     arbitrarily/by experimentation and intuition rather than having
-     any real statistical basis, something that could be improved in
-     the future. To pick the starting XI for any given gameweek, the
-     algorithm will pick the starting 11 that maximizes predicted
-     points for that gameweek and then orders the subs from highest
-     predicted points to the lowest. The transfer process is quite
-     similar to the team selection process. The only difference is I
-     added the constraint that the new team must have only 1 different
-     player than the original team(this can be altered to 2 players, 3
-     players, etc). 
-
 **** Player Points Prediction
+     In order to pick the best team, the algorithm first tries to
+     predict each player's point count over the next 10 gameweeks.
 
      The general process for player point prediction is:
 
@@ -196,8 +157,38 @@
      - Players who are marked as 25%, 50%, and 75% have their point values multiplied accordingly(see the [[https://github.com/dghosef/FPL-team-generator/blob/main/src/pick_team.py][get_data function]])
      Again, this approach was heavily borrowed from u/blubbersassafras's method. 
 
+**** Team selection
+
+     The idea of the team generation algorithm is simple: pick the
+     team that maximizes predicted points(see previous section) given the
+     constraints of FPL(11 starters, 3 subs, max of 3 players per
+     team, budget, etc). Thankfully, python has a very convenient
+     package called [[https://pypi.org/project/PuLP/][PuLP]] that makes solving problems like these a
+     breeze. Essentially, all I had to do was input the constraints
+     and predicted points and the package would spit out the optimal
+     team(see the above link about PuLP for more details). To pick the
+     initial team, I inputted all of the FPL constraints into a PuLP
+     model along with each player's total predicted points over the
+     next 10 gameweeks. In order to take into account the fact that
+     subs don't play all that much and captains get double points, I
+     got the model to pick an overall starting XI, 3 subs, and 2
+     captains for the next 10 weeks with the assumptions that the
+     first, second, and third subs play 20%, 10%, and 5% of the time
+     and each captain gets 1.5x their original predicted points. The
+     sub percents and number of captains were all picked somewhat
+     arbitrarily/by experimentation and intuition rather than having
+     any real statistical basis, something that could be improved in
+     the future. To pick the starting XI for any given gameweek, the
+     algorithm will pick the starting 11 that maximizes predicted
+     points for that gameweek and then orders the subs from highest
+     predicted points to the lowest. The transfer process is quite
+     similar to the team selection process. The only difference is I
+     added the constraint that the new team must have only 1 different
+     player than the original team(this can be altered to 2 players, 3
+     players, etc). 
+
 **** Limitations/things to be improved
-     - Currently the algorithm can't determine how many transfers to make
+     - Currently the algorithm can't determine how many transfers to make so we just make 1 every week
      - Players' creativities and threats amounts are compared to their team's overall levels rather than just the games they played
      - The bonus point algorithm doesn't account for bps magnets/repellants
      - Calculate what percent of each individual team's goals have an assist for more accurate assist predictions
