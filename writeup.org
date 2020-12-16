@@ -4,13 +4,13 @@
    team/player prediction algorithm. Its suggestion for the optimal team
    from gw18-gw28 is:
 
-   Pope \\
-   Cancelo - Dias - Walker-Peters - Bednarek \\
-   De Bruyne - Fernandes - Rashford - Grealish - El Ghazi \\
-   Martial
+   - Pope
+   - Cancelo - Dias - Walker-Peters - Bednarek
+   - De Bruyne - Fernandes - Rashford - Grealish - El Ghazi
+   - Martial
 
-   Subs: \\
-   Rodrigo - Brewster - Hause
+   Subs:
+   - Rodrigo - Brewster - Hause
 
    (Starters and subs would change depending on fixtures)
 
