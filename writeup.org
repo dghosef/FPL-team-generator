@@ -1,4 +1,4 @@
-* FPL Teach - My FPL Team Generator
+* My FPL Team Generator
 ** TLDR
    I wrote an FPL team generator. Its suggestion for the optimal team from gw18-gw28 is:
 
@@ -194,6 +194,10 @@
      - Calculate what percent of each individual team's goals have an assist for more accurate assist predictions
      - Probably a lot more that I meant to remember but forgot
        
-I left out a number of details because this post is already sort of
+ If you want to track my progress, I have an fpl team [[https://www.fantasy.premierleague.con/entry/7742703][here]] that I plan
+to keep updating with the algorithm's choices as the season passes. It
+currently is on negative points because I took a lot of hits while
+experimenting. My hope is to iron out the kinks for next season.  I
+left out a number of details because this post is already sort of
 long, but feel free to check out the [[https://github.com/dghosef/FPL-team-generator/blob/main/src/pick_team.py][github]] and leave any
-suggestions/feedback either there or in the comments
+feedback/questions.
