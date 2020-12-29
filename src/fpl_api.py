@@ -2,8 +2,29 @@
 import os
 import pandas as pd
 import requests
-from pprint import pprint
-from player import Player, position_numbers
+import pickle
+
+from player import Player
+
+
+def get_team_numbers():
+    if not os.path.exists('./data/teams'):
+        main_api_endpoint =\
+            'https://fantasy.premierleague.com/api/bootstrap-static/'
+        main_api_response = requests.get(main_api_endpoint)
+        teams_df = pd.DataFrame(main_api_response.json()['teams'])
+        teams = dict()
+        for team_index in teams_df.index:
+            team_id = teams_df.id[team_index]
+            team_name = teams_df.short_name[team_index]
+            teams[team_id] = team_name
+        # https://stackoverflow.com/questions/11218477/how-can-i-use-pickle-to-save-a-dict
+        with open('./data/teams', 'wb') as handle:
+            pickle.dump(teams, handle)
+    else:
+        with open('./data/teams', 'rb') as handle:
+            teams = pickle.load(handle)
+    return teams
 
 
 def get_player_history(gameweeks, refresh_data=False):
@@ -39,11 +60,13 @@ def get_player_history(gameweeks, refresh_data=False):
             gameweek_dict.setdefault(player_id, list()).\
                 append(int(minutes_played))
     players_dict = dict()
+    teams = get_team_numbers()
     for player_index in players_df.index:
         player_id = players_df.id[player_index]
         player_name = players_df.web_name[player_index]
-        position = position_numbers[players_df.element_type[player_index]]
-        current_player = Player(player_name, position)
+        player_team = teams[players_df.team[player_index]]
+        position = players_df.element_type[player_index]
+        current_player = Player(player_name, position, player_team)
         # API multiplies actual cost by 10
         price = players_df.now_cost[player_index] / 10.0
         news = players_df.news[player_index]
@@ -58,5 +81,11 @@ def get_player_history(gameweeks, refresh_data=False):
     return players_dict
 
 
-if __name__ == '__main__':
-    (get_player_history([1, 3, 5]))
+if __name__ == "__main__":
+    from pprint import pprint
+    should_print = False
+    if should_print:
+        pprint(get_player_history([1, 3, 5]))
+    else:
+        get_player_history([1, 3, 5])
+
