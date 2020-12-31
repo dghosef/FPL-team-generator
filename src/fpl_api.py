@@ -57,8 +57,12 @@ def get_player_history(gameweeks, refresh_data=False):
         for player_index in gameweek_df.index:
             player_id = gameweek_df.id[player_index]
             minutes_played = gameweek_df.stats[player_index]['minutes']
-            gameweek_dict.setdefault(player_id, list()).\
-                append(int(minutes_played))
+            creativity = gameweek_df.stats[player_index]['creativity']
+            threat = gameweek_df.stats[player_index]['threat']
+            gameweek_dict.setdefault(player_id, [list()] * 3)
+            gameweek_dict[player_id][0].append(int(minutes_played))
+            gameweek_dict[player_id][1].append(float(creativity))
+            gameweek_dict[player_id][2].append(float(threat))
     players_dict = dict()
     teams = get_team_numbers()
     for player_index in players_df.index:
@@ -81,11 +85,39 @@ def get_player_history(gameweeks, refresh_data=False):
     return players_dict
 
 
-if __name__ == "__main__":
-    from pprint import pprint
-    should_print = False
-    if should_print:
-        pprint(get_player_history([1, 3, 5]))
-    else:
-        get_player_history([1, 3, 5])
+# excludes cur_gw. Matches retured in format (other team, original team goals, other team goals)
+def get_fixtures(cur_gw, refresh_data=False):
+    if not os.path.exists('./data/'):
+        os.makedirs('./data/')
+    if not os.path.exists('./data/fixtures'):
+        os.makedirs('./data/fixtures')
+    scores = dict()
+    for gameweek in range(1, cur_gw):
+        if refresh_data or not os.path.exists(f'./data/fixtures/{gameweek}'):
+            print(f"grabbing data for gameweek {gameweek}")
+            gameweek_api_endpoint = ('https://fantasy.premierleague.com/api/'
+                                     f'fixtures/?event={gameweek}')
+            gameweek_api_response = requests.get(gameweek_api_endpoint)
+            gameweek_df = \
+                pd.DataFrame(gameweek_api_response.json())
+            gameweek_df.to_pickle(f'./data/fixtures/{gameweek}')
+        else:
+            gameweek_df = pd.read_pickle(f'./data/fixtures/{gameweek}')
+        teams = get_team_numbers()
+        for i in range(len(gameweek_df['id'])):
+            home_team = teams[gameweek_df['team_h'][i]]
+            away_team = teams[gameweek_df['team_a'][i]]
+            home_score = gameweek_df['team_h_score'][i]
+            away_score = gameweek_df['team_a_score'][i]
+            scores.setdefault(home_team, list()). \
+                append((away_team, home_score, away_score))
+            scores.setdefault(away_team, list()). \
+                append((home_team, away_score, home_score))
+    return scores
 
+
+if __name__ == "__main__":
+    scores = get_fixtures(3)
+    log = True
+    if log:
+        print(scores)

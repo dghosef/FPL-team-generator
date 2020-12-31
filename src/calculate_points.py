@@ -66,7 +66,7 @@ def calculate_points(cs_file, attack_file, gameweeks, min_mins,
     history = fpl_api.get_player_history(gameweeks, refresh_data)
     for current_player in player_data:
         factor = 1
-        if sum(history[current_player]['gw_history']) < min_mins or \
+        if sum(history[current_player]['gw_history'][0]) < min_mins or \
                 history[current_player]['status'] not in good_status:
             factor = 0
         for gameweek in player_data[current_player]:
@@ -81,8 +81,7 @@ def calculate_points(cs_file, attack_file, gameweeks, min_mins,
 if __name__ == '__main__':
     should_print = True
     if should_print:
-        points = calculate_points("data/cs.html", "data/attack.html", [11, 12, 13, 14], 270)
-        players = [Player("Saka", 3, "ARS")]
+        points = calculate_points("data/cs.html", "data/attack.html", [13, 14, 15, 16], 270)
         for player in players:
             current_player_data = points[0][player]
             point_value = sum(current_player_data[i]['points'] for i in current_player_data)
