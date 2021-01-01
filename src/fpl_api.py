@@ -59,7 +59,7 @@ def get_player_history(gameweeks, refresh_data=False):
             minutes_played = gameweek_df.stats[player_index]['minutes']
             creativity = gameweek_df.stats[player_index]['creativity']
             threat = gameweek_df.stats[player_index]['threat']
-            gameweek_dict.setdefault(player_id, [[] for _ in range(3)]) # To make different lists
+            gameweek_dict.setdefault(player_id, [[] for _ in range(3)])
             gameweek_dict[player_id][0].append(int(minutes_played))
             gameweek_dict[player_id][1].append(float(creativity))
             gameweek_dict[player_id][2].append(float(threat))
@@ -85,7 +85,9 @@ def get_player_history(gameweeks, refresh_data=False):
     return players_dict
 
 
-# excludes cur_gw. Matches retured in format (other team, original team goals, other team goals)
+# excludes cur_gw.
+# Matches retured in format
+# (other team, original team goals, other team goals)
 def get_past_fixtures(cur_gw, refresh_data=False):
     if not os.path.exists('./data/'):
         os.makedirs('./data/')
