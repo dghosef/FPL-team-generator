@@ -1,12 +1,12 @@
 # https://www.reddit.com/r/FantasyPL/comments/dg1to7/an_analysis_of_overanalysis_my_adventure_in_fpl/
-from fpl_api import get_team_numbers, get_fixtures
 import math
-import itertools
+from fpl_api import get_team_numbers, get_past_fixtures, get_future_fixtures, \
+    get_player_history
 
 
 def team_strengths(cur_gw, num_gws=5, refresh_data=False, avg_scored=1.36,
-                   iterations=50, num_samples=1):
-    fixtures = get_fixtures(cur_gw, refresh_data)
+                   iterations=50, num_samples=4):
+    fixtures = get_past_fixtures(cur_gw, refresh_data)
     # initialize [defensive strength, offensive strength] to [1, 1]
     strengths = dict(zip(get_team_numbers().values(), [[1, 1]] * 20))
     avg_strengths = dict(zip(get_team_numbers().values(), [[0, 0]] * 20))
@@ -47,38 +47,68 @@ def predict_score(team1, team2, strengths, avg_scored=1.36):
         avg_scored * strength2[1] * strength1[0]
 
 
-def goal_count_probability(expected_goals, test_goals):
-    return (expected_goals ** test_goals) * (math.e ** (-1 * expected_goals)) \
-        / math.factorial(test_goals)
+# per 90
+def team_ct(gameweeks, refresh_data=False):
+    history = get_player_history(gameweeks, refresh_data)
+    creativities = dict(zip(get_team_numbers().values(), [0]*20))
+    threats = dict(zip(get_team_numbers().values(), [0]*20))
+    for current_player in history:
+        # Whenever FPL adds a new player, we have illegal data
+        if history[current_player]['gw_history'] == []:
+            history[current_player]['gw_history'] = [[0], [0.0], [0.0]]
+            continue
+        threats[current_player.team] += \
+            sum(history[current_player]['gw_history'][2])
+        creativities[current_player.team] += \
+            sum(history[current_player]['gw_history'][1])
+    for team in creativities:
+        creativities[team] /= len(gameweeks)
+        threats[team] /= len(gameweeks)
+    return creativities, threats, history
 
 
-def score_probabilities(team1, team2, strengths, avg_scored=1.36,
-                        max_goals=10):
-    # https://en.wikipedia.org/wiki/Poisson_distribution
-    max_goals = max_goals
-    predicted_score = predict_score(team1, team2, strengths, avg_scored)
-    possible_scores = list(itertools.product(range(max_goals + 1),
-                                             range(max_goals + 1)))
-    scores_dict = dict()
-    for test_score in possible_scores:
-        scores_dict[test_score] = \
-            goal_count_probability(predicted_score[0], test_score[0]) * \
-            goal_count_probability(predicted_score[1], test_score[1])
-    return scores_dict
-
-
-# returns prob of team1 winning, prob of team2 winning, prob of draw
-def winner_probability(team1, team2, strengths, avg_scored=1.36, max_goals=10):
-    scores = \
-        score_probabilities(team1, team2, strengths, avg_scored, max_goals)
-    return sum(scores[i] for i in scores if i[0] > i[1]), \
-        sum(scores[i] for i in scores if i[0] < i[1]), \
-        sum(scores[i] for i in scores if i[0] == i[1])
+def performance_predictions(past_gameweeks, future_gameweeks, strengths,
+                            refresh_data=False, avg_scored=1.36,
+                            avg_assisted=.75):
+    creativities, threats, history = team_ct(past_gameweeks, refresh_data)
+    future_fixtures = get_future_fixtures(future_gameweeks)
+    for player in history:
+        total_minutes = sum([i for i in history[player]['gw_history'][0]])
+        if total_minutes == 0:
+            goals = [0]
+            assists = [0]
+            cleansheets = [0]
+            points = [0]
+        else:
+            total_creativity = \
+                sum([i for i in history[player]['gw_history'][1]])
+            total_threat = sum([i for i in history[player]['gw_history'][2]])
+            creativity_per_90 = total_creativity / total_minutes * 90
+            threat_per_90 = total_threat / total_minutes * 90
+            percent_creativity = creativity_per_90 / creativities[player.team]
+            percent_threat = threat_per_90 / threats[player.team]
+            predicted_scores = \
+                [predict_score(player.team, i, strengths, avg_scored)
+                 for i in future_fixtures[player.team]]
+            assists = list()
+            goals = list()
+            cleansheets = list()
+            points = list()
+            for score in predicted_scores:
+                # poisson distribution
+                cleansheets.append(math.e ** (-1 * score[1]))
+                assists.append(score[0] * percent_creativity * avg_assisted)
+                goals.append(score[0] * percent_threat)
+                points.append(
+                    player.points(cleansheets[-1], assists[-1], goals[-1]))
+        history[player]['goals'] = goals
+        history[player]['assists'] = assists
+        history[player]['cleansheets'] = cleansheets
+        history[player]['points'] = points
+    return history
 
 
 if __name__ == "__main__":
-    team1 = "BUR"
-    team2 = "SOU"
-    for i in range(200):
-        strengths = team_strengths(16, iterations=i, num_samples=4)
-        print(predict_score(team1, team2, strengths))
+    from pprint import pprint
+    strengths = team_strengths(16)
+    pprint(performance_predictions([11, 12, 13, 14, 15, 16], [16, 17, 18], strengths))

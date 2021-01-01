@@ -19,6 +19,7 @@ class Player():
         return hash((self.name, self.position, self.team))
 
     def __eq__(self, other):
+        print(other)
         return (self.name, self.position, self.team) == \
             (other.name, other.position, other.team)
 

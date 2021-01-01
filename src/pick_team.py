@@ -1,36 +1,41 @@
 # thanks to https://github.com/joconnor-ml/forecasting-fantasy-football
 from base_lp_model import base_lp_model
 from player import Player
+from predict_points import performance_predictions, team_strengths
 
-from calculate_points import calculate_points
 
-
-def get_data(gameweeks, min_mins, refresh_data):
-    min_mins = len(gameweeks) * 60
-    player_data, history = calculate_points("data/cs.html", "data/attack.html",
-                                            gameweeks, min_mins,
-                                            refresh_data=refresh_data)
+def get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
+             refresh_data=False, avg_scored=1.36, avg_assistsed=.75,
+             good_status=['a']):
+    player_data = performance_predictions(past_gameweeks, future_gameweeks,
+                                          strengths, refresh_data, avg_scored,
+                                          avg_assistsed)
     players = list()
     teams = list()
     points = list()
     positions = list()
     prices = list()
     for player in player_data:
+        if sum(player_data[player]['gw_history'][0]) < min_mins or \
+                player_data[player]['status'] not in good_status:
+            continue
         players.append(player)
         teams.append(player.team)
-        current_player_data = player_data[player]
         points.append(
-            sum(current_player_data[i]['points'] for i in current_player_data))
-        prices.append(history[player]['price'])
+            sum(player_data[player]['points']))
+        prices.append(player_data[player]['price'])
         positions.append(player.position)
     return players, teams, points, positions, prices
 
 
-def pick_team(gameweeks, budget=100, min_mins=4*60, refresh_data=False,
-              sub_factors=[0.3, 0.2, 0.1], next_gw=None,
+def pick_team(past_gameweeks, future_gameweeks, budget=100, min_mins=4*60,
+              refresh_data=False, sub_factors=[0.3, 0.2, 0.1], next_gw=None,
               num_captains=1):
+    strengths = \
+        team_strengths(future_gameweeks[0], len(past_gameweeks), refresh_data)
     players, teams, points, positions, prices =  \
-        get_data(gameweeks, min_mins, refresh_data)
+        get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
+                 refresh_data=refresh_data)
     num_players = len(players)
     model, starting_decisions, sub_1_decision, sub_2_decision, \
         sub_3_decision, captain_decisions = \
@@ -47,18 +52,20 @@ def pick_team(gameweeks, budget=100, min_mins=4*60, refresh_data=False,
 
 
 # figure out how to deal with doubts
-def transfer(current_team, selling_prices, transfer_count, gameweeks,
-             itb=0, min_mins=4*60, refresh_data=False,
+def transfer(current_team, selling_prices, transfer_count, past_gameweeks,
+             future_gameweeks, itb=0, min_mins=5*60, refresh_data=False,
              sub_factors=[0.3, 0.2, 0.1], next_gw=None, num_captains=1):
     budget = sum(selling_prices) + itb
+    strengths = \
+        team_strengths(future_gameweeks[0], len(past_gameweeks), refresh_data)
     players, teams, points, positions, prices =  \
-        get_data(gameweeks, min_mins, refresh_data)
+        get_data(past_gameweeks, future_gameweeks, strengths, min_mins)
     num_players = len(players)
     # Adjust pricing
     for i in range(len(current_team)):
         if not current_team[i] in players:
-            players.append([current_team[i]])
-            prices.append([selling_prices[i]])
+            players.append(current_team[i])
+            prices.append(selling_prices[i])
             points.append(0)
             teams.append(current_team[i].team)
             positions.append(current_team[i].position)
@@ -88,6 +95,12 @@ def transfer(current_team, selling_prices, transfer_count, gameweeks,
         sub_3_decision, captain_decisions
 
 
+def print_xi(xi):
+    team = {1: list(), 2: list(), 3: list(), 4: list()}
+    for player in xi:
+        team[player.position].append(player)
+    for position in team:
+        print(team[position])
 if __name__ == "__main__":
     current_team = [Player("Martínez", 1, "AVL"),
                     Player("Taylor", 2, "BUR"),
@@ -107,7 +120,8 @@ if __name__ == "__main__":
               6.3, 6.0, 10.7]
 
     players, starting, sub1, sub2, sub3, captain = \
-        transfer(current_team, prices, 2, [11, 12, 13, 14, 15], num_captains=2, itb=.2)
+        transfer(current_team, prices, 2, [11, 12, 13, 14, 15],
+                 range(16, 26), num_captains=2, itb=.2)
     print(list(players[i] for i in range(len(players)) if
           starting[i].value() != 0))
     for sub in (sub1, sub2, sub3):
@@ -117,9 +131,10 @@ if __name__ == "__main__":
           captain[i].value() != 0))
 
     players, starting, sub1, sub2, sub3, captain = \
-        pick_team([11, 12, 13, 14, 15], num_captains=2, budget=95.9)
-    print(list(players[i] for i in range(len(players)) if
-          starting[i].value() != 0))
+        pick_team(range(7, 17), range(17, 27), num_captains=2,
+                  min_mins=760, budget=96, refresh_data=False)
+    print_xi([players[i] for i in range(len(players)) if
+              starting[i].value() != 0])
     for sub in (sub1, sub2, sub3):
         print(list(players[i] for i in range(len(players))
                    if sub[i].value() != 0))

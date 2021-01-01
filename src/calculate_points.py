@@ -82,6 +82,7 @@ if __name__ == '__main__':
     should_print = True
     if should_print:
         points = calculate_points("data/cs.html", "data/attack.html", [13, 14, 15, 16], 270)
+        players = [Player("Saka", 3, "ARS")]
         for player in players:
             current_player_data = points[0][player]
             point_value = sum(current_player_data[i]['points'] for i in current_player_data)
