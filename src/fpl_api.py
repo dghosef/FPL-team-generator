@@ -150,7 +150,7 @@ def get_future_fixtures(gameweeks, refresh_data=False):
 
 if __name__ == "__main__":
     from pprint import pprint
-    fixtures = get_future_fixtures(16, 3)
+    fixtures = get_future_fixtures(range(17, 20))
     log = True
     if log:
         pprint(fixtures)
