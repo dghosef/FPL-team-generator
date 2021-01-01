@@ -7,6 +7,7 @@ import pickle
 from player import Player
 
 
+# returns a dict with the format {team id: team name}
 def get_team_numbers():
     if not os.path.exists('./data/teams'):
         main_api_endpoint =\
@@ -18,7 +19,6 @@ def get_team_numbers():
             team_id = teams_df.id[team_index]
             team_name = teams_df.short_name[team_index]
             teams[team_id] = team_name
-        # https://stackoverflow.com/questions/11218477/how-can-i-use-pickle-to-save-a-dict
         with open('./data/teams', 'wb') as handle:
             pickle.dump(teams, handle)
     else:
@@ -27,21 +27,15 @@ def get_team_numbers():
     return teams
 
 
-def get_player_history(gameweeks, refresh_data=False):
-    if not os.path.exists('./data/'):
-        os.makedirs('./data/')
-    if refresh_data or not os.path.exists('./data/general_info_fpl_api'):
-        print("grabbing data from the general information fpl api")
-        main_api_endpoint =\
-            'https://fantasy.premierleague.com/api/bootstrap-static/'
-        main_api_response = requests.get(main_api_endpoint)
-        players_df = pd.DataFrame(main_api_response.json()['elements'])
-        players_df.to_pickle('./data/general_info_fpl_api')
-    else:
-        players_df = pd.read_pickle('./data/general_info_fpl_api')
+""""
+Returns a dict of a player's history in the form
+{player_id: [[minutes], [creativity], [threat]] where minutes, creativity,
+and threat are their respective values of each gameweek
+"""
+
+
+def get_gw_history(gameweeks, refresh_data=False):
     gameweek_dict = dict()
-    if not os.path.exists('./data/gameweeks'):
-        os.makedirs('./data/gameweeks')
     for gameweek in gameweeks:
         if os.path.isfile(f'./data/gameweeks/{gameweek}') and \
                 not refresh_data:
@@ -63,6 +57,34 @@ def get_player_history(gameweeks, refresh_data=False):
             gameweek_dict[player_id][0].append(int(minutes_played))
             gameweek_dict[player_id][1].append(float(creativity))
             gameweek_dict[player_id][2].append(float(threat))
+    return gameweek_dict
+
+
+"""
+Gets player history for gameweeks. Returns a dict with format
+{Player: {'gw_history': [[minutes], [creativity], [threat]],
+          'price': price,
+          'id': player id,
+          'news': injury news,
+          'status': availability status('a', 'd', 'i', 'n', 's', or 'u') }
+"""
+
+
+def get_player_history(gameweeks, refresh_data=False):
+    if not os.path.exists('./data/'):
+        os.makedirs('./data/')
+    if refresh_data or not os.path.exists('./data/general_info_fpl_api'):
+        print("grabbing data from the general information fpl api")
+        main_api_endpoint =\
+            'https://fantasy.premierleague.com/api/bootstrap-static/'
+        main_api_response = requests.get(main_api_endpoint)
+        players_df = pd.DataFrame(main_api_response.json()['elements'])
+        players_df.to_pickle('./data/general_info_fpl_api')
+    else:
+        players_df = pd.read_pickle('./data/general_info_fpl_api')
+    gameweek_dict = get_gw_history(gameweeks, refresh_data)
+    if not os.path.exists('./data/gameweeks'):
+        os.makedirs('./data/gameweeks')
     players_dict = dict()
     teams = get_team_numbers()
     for player_index in players_df.index:
@@ -85,9 +107,15 @@ def get_player_history(gameweeks, refresh_data=False):
     return players_dict
 
 
-# excludes cur_gw.
-# Matches retured in format
-# (other team, original team goals, other team goals)
+"""
+Fetches a team's past fixtures and scores from gw1(inclusive) to
+cur_gw(exclusive). Returns a dict in the format
+{t1: [(t2, t1 goals, t2 goals), (t3, t1 goals, t3 goals) ...]
+where t1 is the original team, t2 is t1's first opponent, t3 is t1's 2nd
+opponent, etc
+"""
+
+
 def get_past_fixtures(cur_gw, refresh_data=False):
     if not os.path.exists('./data/'):
         os.makedirs('./data/')
@@ -119,8 +147,12 @@ def get_past_fixtures(cur_gw, refresh_data=False):
     return scores
 
 
-# returns fixtures of cur_gw, cur_gw +1 ... cur_gw + num_gws
-# in format(other team, original team goals, other team goals
+"""
+Returns a dict of fixtures in gameweeks in the form
+{team 1: [opponent 1, opponent 2, opponent 3, ...]}
+"""
+
+
 def get_future_fixtures(gameweeks, refresh_data=False):
     fixtures = dict()
     if not os.path.exists('./data/'):

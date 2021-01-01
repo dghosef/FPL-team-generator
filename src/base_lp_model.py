@@ -1,5 +1,20 @@
-# thanks to https://github.com/joconnor-ml/forecasting-fantasy-football
+# https://github.com/joconnor-ml/forecasting-fantasy-football
 import pulp
+
+
+"""
+Returns a PuLP model containing the FPL objective function and starting xi,
+position count, team count, captaincy count, and sub count constraints. Also
+returns an unsolved starting xi decisions list, substitute 1 decisions list,
+substitute 2 decisions list, substitute 3 decisions list, and captaincy
+decisions list. Model does not include the cost constraint.
+
+Takes in lists of players, their respective teams, their respective predicted
+points, their respective positions, their respective prices, the number of
+captains, and a tuple/list of size 3 in form [s1, s2, s3], where s1, s2, and
+s3 are the probabilities that the first sub, second sub, and third sub will
+play respectively.
+"""
 
 
 def base_lp_model(players, teams, points, positions, prices, num_captains,
@@ -66,7 +81,7 @@ def base_lp_model(players, teams, points, positions, prices, num_captains,
     model += sum(starting_decisions[i] + sub_1_decision[i] +
                  sub_2_decision[i] + sub_3_decision[i]
                  for i in range(num_players) if positions[i] == 4) == 3
-    # club constraint
+    # No more than 3 players from each club
     for team in teams:
         model += sum(starting_decisions[i] + sub_1_decision[i] +
                      sub_2_decision[i] + sub_3_decision[i]
@@ -82,8 +97,9 @@ def base_lp_model(players, teams, points, positions, prices, num_captains,
         model += (sub_2_decision[i] + sub_1_decision[i]) <= 1
         model += (sub_3_decision[i] + sub_2_decision[i]) <= 1
         model += (sub_1_decision[i] + sub_3_decision[i]) <= 1
-    model += sum(starting_decisions) == 11
-    model += sum(captain_decisions) == num_captains
+    model += sum(starting_decisions) == 11  # 11 starters
+    model += sum(captain_decisions) == num_captains  # num_captains captains
+    # 3 subs
     model += sum(sub_1_decision) == 1
     model += sum(sub_2_decision) == 1
     model += sum(sub_3_decision) == 1
