@@ -110,6 +110,22 @@ def team_ct(gameweeks, refresh_data=False):
     return creativities, threats, history
 
 
+# Predict save count in each of future_fixtures
+def predict_saves(strengths, past_fixtures, future_fixtures, past_saves,
+                  minutes, team):
+    num_games = len(past_fixtures[team])
+    # saves / opponent attacking strength
+    save_rate = 0
+    for index, saves in enumerate(past_saves[:-1]):
+        if minutes[index] == 0:
+            continue
+        # opponent attacking strength
+        strength = strengths[past_fixtures[team][index + num_games -
+                                                 len(past_saves)][0]][1]
+        save_rate += saves / strength / num_games * minutes[index] / 90
+    return [save_rate * strengths[i][1] for i in future_fixtures[team]]
+
+
 """
 Using performances from past_gameweeks and strengths in strengths, predicts
 each player's future points in each of their fixtures in future_gameweeks
@@ -126,6 +142,7 @@ def performance_predictions(past_gameweeks, future_gameweeks, strengths,
                             avg_assisted=.75):
     creativities, threats, history = team_ct(past_gameweeks, refresh_data)
     future_fixtures = get_future_fixtures(future_gameweeks, refresh_data)
+    past_fixtures = get_past_fixtures(future_gameweeks[0])
     for player in history:
         total_minutes = sum([i for i in history[player]['gw_history'][0]])
         # To avoid divide by 0 errors
@@ -133,7 +150,9 @@ def performance_predictions(past_gameweeks, future_gameweeks, strengths,
             goals = [0]
             assists = [0]
             cleansheets = [0]
+            conceed_2 = [0]
             points = [0]
+            saves = [0] * 38
         else:
             total_creativity = \
                 sum([i for i in history[player]['gw_history'][1]])
@@ -144,32 +163,40 @@ def performance_predictions(past_gameweeks, future_gameweeks, strengths,
             creativity_influence = \
                 creativity_per_90 / creativities[player.team]
             threat_influence = threat_per_90 / threats[player.team]
+            if player.team not in future_fixtures:
+                future_fixtures[player.team] = []
             predicted_scores = \
                 [predict_score(player.team, i, strengths, avg_scored)
                  for i in future_fixtures[player.team]]
+            saves = predict_saves(strengths, past_fixtures, future_fixtures,
+                                  history[player]['gw_history'][3],
+                                  history[player]['gw_history'][0],
+                                  player.team)
             assists = list()
             goals = list()
             cleansheets = list()
+            conceed_2 = list()
             points = list()
-            for score in predicted_scores:
+            for index, score in enumerate(predicted_scores):
                 cleansheets.append(goal_count_probability(score[1], 0))
+                conceed_2.append(sum([goal_count_probability(score[1], i)
+                                      for i in range(2, 7)]))
                 assists.append(score[0] * creativity_influence * avg_assisted)
                 goals.append(score[0] * threat_influence)
                 points.append(
-                    player.points(cleansheets[-1], assists[-1], goals[-1]))
+                    player.points(cleansheets[-1], assists[-1], goals[-1],
+                                  saves[index], conceed_2[-1]))
         history[player]['goals'] = goals
         history[player]['assists'] = assists
         history[player]['cleansheets'] = cleansheets
+        history[player]['saves'] = saves
         history[player]['points'] = points
     return history
 
 
 if __name__ == "__main__":
     from pprint import pprint
-    team1 = 'LEE'
-    team2 = 'WBA'
-    for i in range(0, 50):
-        strengths = \
-            team_strengths(range(11, 17), weights=[1] * 6, iterations=i,
-                           num_samples=4)
-        pprint(predict_score(team1, team2, strengths))
+    strengths = team_strengths([11, 12, 13, 14, 15])
+    past_fixtures = get_past_fixtures(15)
+    future_fixtures = get_future_fixtures(range(19, 30))
+    past_saves = [10] * 14

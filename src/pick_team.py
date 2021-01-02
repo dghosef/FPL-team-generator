@@ -39,6 +39,7 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
     points = list()
     positions = list()
     prices = list()
+    next_week = list()
     for player in player_data:
         if sum(player_data[player]['gw_history'][0][-num_gws:]) < min_mins or \
                 player_data[player]['status'] not in good_status:
@@ -49,7 +50,8 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
             sum(player_data[player]['points']))
         prices.append(player_data[player]['price'])
         positions.append(player.position)
-    return players, teams, points, positions, prices
+        next_week.append(player_data[player]['points'][0])
+    return players, teams, points, positions, prices, next_week
 
 
 """
@@ -74,28 +76,28 @@ def lp_team_select(past_gameweeks, future_gameweeks, weights=None, budget=96,
                    sub_factors=[0.3, 0.2, 0.1], num_captains=2):
     strengths = \
         team_strengths(past_gameweeks, weights, refresh_data=refresh_data)
-    players, teams, points, positions, prices =  \
+    players, teams, points, positions, prices, next_week =  \
         get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
                  num_gws, refresh_data=refresh_data)
     num_players = len(players)
     model, starting_decisions, sub_1_decision, sub_2_decision, \
         sub_3_decision, captain_decisions = \
-        base_lp_model(players, teams, points, positions, prices,
-                      num_captains, sub_factors)
+        base_lp_model(players, teams, points, positions, num_captains,
+                      sub_factors)
     # max cost constraint
     model += sum((starting_decisions[i] + sub_1_decision[i] + sub_2_decision[i]
                   + sub_3_decision[i]) * prices[i]
                  for i in range(num_players)) <= budget  # total cost
     model.solve()
     return players, starting_decisions, sub_1_decision, sub_2_decision, \
-        sub_3_decision, captain_decisions, model.objective.value()
+        sub_3_decision, captain_decisions, next_week
 
 
 """
 Given a current_team which is a list of 14 Player objects(exclude backup gk),
-a list of their current selling costs, a maximum number of transfers, and the
-amount of money in the bank(itb) suggests which players to remove. Arguments
-are largely the same as lp_team_select except itb replaces budget.
+a list of their current selling costs, a maximum number of transfer_count, and
+the amount of money in the bank(itb) suggests which players to remove.
+Arguments are largely the same as lp_team_select except itb replaces budget.
 """
 
 
@@ -106,7 +108,7 @@ def lp_transfer(current_team, selling_prices, transfer_count, past_gameweeks,
     budget = sum(selling_prices) + itb
     strengths = \
         team_strengths(past_gameweeks, weights, refresh_data=refresh_data)
-    players, teams, points, positions, prices =  \
+    players, teams, points, positions, prices, next_week =  \
         get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
                  num_gws)
     num_players = len(players)
@@ -118,24 +120,36 @@ def lp_transfer(current_team, selling_prices, transfer_count, past_gameweeks,
                 prices[i] = selling_prices[j]
     model, starting_decisions, sub_1_decision, sub_2_decision, \
         sub_3_decision, captain_decisions = \
-        base_lp_model(players, teams, points, positions, prices,
-                      num_captains, sub_factors)
+        base_lp_model(players, teams, points, positions, num_captains,
+                      sub_factors)
     # max cost constraint
     model += sum((starting_decisions[i] + sub_1_decision[i] + sub_2_decision[i]
                   + sub_3_decision[i]) * prices[i]
                  for i in range(num_players)) <= budget  # total cost
-    # max transfers constraints
+    # max transfer_count constraints
     model += sum(starting_decisions[i] + sub_1_decision[i] +
                  sub_2_decision[i] + sub_3_decision[i]
                  for i in range(num_players) if players[i] in current_team) \
         >= len(current_team) - transfer_count
     model.solve()
     return players, starting_decisions, sub_1_decision, sub_2_decision, \
-        sub_3_decision, captain_decisions, model.objective.value()
+        sub_3_decision, captain_decisions, next_week
 
 
 def find_weights(size, factor, step_size):
-    return [factor ** (i // step_size) for i in range(size)]
+    return [factor ** (i // step_size)
+            for i in range(size // step_size * step_size + 3)][-size:]
+
+
+"""
+Pick team and print it nicely.
+past_gws - number of past gameweeks to consider when judging player ability
+future_gws - number of gameweeks to forecast for
+min_mins and num_gws - player must have played min_mins over num_gws
+refresh_data - whether or not to grab data from the fpl api
+sub_factors - the probability each sub comes on
+num_captains - number of estimated players to share the armband
+"""
 
 
 def pick_team(cur_gw, past_gws=9, future_gws=10, budget=96, min_mins=270,
@@ -143,22 +157,85 @@ def pick_team(cur_gw, past_gws=9, future_gws=10, budget=96, min_mins=270,
               num_captains=2):
     if cur_gw < past_gws:
         past_gws = cur_gw - 1
-    players, starting, sub1, sub2, sub3, captain = \
+    players, starting, sub1, sub2, sub3, captain, next_week = \
         lp_team_select(range(cur_gw - past_gws, cur_gw),
                        range(cur_gw, cur_gw+future_gws),
-                       weights=find_weights(past_gws, 3/2, 3), budget=budget,
+                       weights=find_weights(past_gws, 2, 3), budget=budget,
                        min_mins=min_mins, num_gws=num_gws,
                        refresh_data=refresh_data, sub_factors=sub_factors,
                        num_captains=num_captains)
+    next_week = [next_week[i] for i in range(len(players)) if
+                 starting[i].value() != 0 or sub1[i].value() != 0 or
+                 sub2[i].value() != 0 or sub3[i].value() != 0]
+    players = [players[i] for i in range(len(players)) if
+               starting[i].value() != 0 or sub1[i].value() != 0 or
+               sub2[i].value() != 0 or sub3[i].value() != 0]
+
+    starting_xi, subs, captains = pick_xi(players, next_week)
+    print(next_week)
+    print(players)
+    print(f'gw {cur_gw} starters:')
+    print_xi(starting_xi)
+    print('')
+    print('Subs:')
+    print(subs)
+    print('')
+    print('Captains:')
+    print(captains)
+
+
+def transfer(cur_gw, team, prices, transfer_count, past_gws=9, future_gws=10,
+             itb=96, min_mins=270, num_gws=4, refresh_data=False,
+             sub_factors=[.2, .1, .05], num_captains=2):
+    players, starting, sub1, sub2, sub3, captain, next_week = \
+        lp_transfer(team, prices, transfer_count, range(cur_gw - past_gws,
+                                                        cur_gw),
+                    range(cur_gw, cur_gw+future_gws),
+                    weights=find_weights(past_gws, 2, 3), itb=itb,
+                    min_mins=min_mins, num_gws=num_gws,
+                    refresh_data=refresh_data, sub_factors=sub_factors,
+                    num_captains=num_captains)
     starting_xi = [players[i] for i in range(len(players)) if
                    starting[i].value() != 0]
+    next_week = [next_week[i] for i in range(len(players)) if
+                 starting[i].value() != 0 or sub1[i].value() != 0 or
+                 sub2[i].value() != 0 or sub3[i].value() != 0]
+    players = [players[i] for i in range(len(players)) if
+               starting[i].value() != 0 or sub1[i].value() != 0 or
+               sub2[i].value() != 0 or sub3[i].value() != 0]
+    starting_xi, subs, captains = pick_xi(players, next_week)
+    print(f'gw {cur_gw} starters:')
+    print_xi(starting_xi)
+    print('')
+    print('Subs:')
+    print(subs)
+    print('')
+    print('Captains:')
+    print(captains)
+    new_team = starting_xi + subs
+    print('\n Buy:')
+    print([i for i in new_team if i not in team])
+    print('\n Sell:')
+    print([i for i in team if i not in new_team])
+
+
+def pick_xi(players, next_week):
+    teams = [i.team for i in players]
+    positions = [i.position for i in players]
+    model, starting_decisions, sub_1_decision, sub_2_decision, \
+        sub_3_decision, captain_decision = \
+        base_lp_model(players, teams, next_week, positions, 1,
+                      sub_factors=[0, 0, 0])
+    model.solve()
+    starters = [players[i] for i in range(len(players))
+                if starting_decisions[i].value() != 0]
     subs = list()
-    for sub in (sub1, sub2, sub3):
+    for sub in (sub_1_decision, sub_2_decision, sub_3_decision):
         subs += [players[i] for i in range(len(players))
                  if sub[i].value() != 0]
     captains = [players[i] for i in range(len(players)) if
-                captain[i].value() != 0]
-    return starting_xi, subs, captains
+                captain_decision[i].value() != 0]
+    return starters, subs, captains
 
 
 def print_xi(xi):
@@ -186,15 +263,5 @@ if __name__ == "__main__":
                     Player("Kane", 4, "TOT")]
     prices = [4.9, 4.5, 5.8, 5.5, 4.7, 4.1, 7.6, 12.4, 11.0, 4.4, 9.3,
               6.3, 6.0, 10.7]
-
-    players, starting, sub1, sub2, sub3, captain = \
-        lp_transfer(current_team, prices, 2, [11, 12, 13, 14, 15],
-                    range(16, 26), None, num_captains=2, itb=.2)
-    print(list(players[i] for i in range(len(players)) if
-          starting[i].value() != 0))
-    for sub in (sub1, sub2, sub3):
-        print(list(players[i] for i in range(len(players))
-                   if sub[i].value() != 0))
-    print(list(players[i] for i in range(len(players)) if
-          captain[i].value() != 0))
-    print(pick_team(5))
+    transfer(16, current_team, prices, 2)
+    pick_team(17)

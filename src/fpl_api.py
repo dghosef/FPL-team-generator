@@ -29,8 +29,8 @@ def get_team_numbers():
 
 """"
 Returns a dict of a player's history in the form
-{player_id: [[minutes], [creativity], [threat]] where minutes, creativity,
-and threat are their respective values of each gameweek
+{player_id: [[minutes], [creativity], [threat], [saves]] where minutes,
+creativity, threat, and saves are their respective values of each gameweek
 """
 
 
@@ -53,10 +53,12 @@ def get_gw_history(gameweeks, refresh_data=False):
             minutes_played = gameweek_df.stats[player_index]['minutes']
             creativity = gameweek_df.stats[player_index]['creativity']
             threat = gameweek_df.stats[player_index]['threat']
-            gameweek_dict.setdefault(player_id, [[] for _ in range(3)])
+            saves = gameweek_df.stats[player_index]['saves']
+            gameweek_dict.setdefault(player_id, [[] for _ in range(4)])
             gameweek_dict[player_id][0].append(int(minutes_played))
             gameweek_dict[player_id][1].append(float(creativity))
             gameweek_dict[player_id][2].append(float(threat))
+            gameweek_dict[player_id][3].append(float(saves))
     return gameweek_dict
 
 

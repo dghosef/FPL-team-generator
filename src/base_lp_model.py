@@ -10,14 +10,14 @@ substitute 2 decisions list, substitute 3 decisions list, and captaincy
 decisions list. Model does not include the cost constraint.
 
 Takes in lists of players, their respective teams, their respective predicted
-points, their respective positions, their respective prices, the number of
+points, their respective positions, the number of
 captains, and a tuple/list of size 3 in form [s1, s2, s3], where s1, s2, and
 s3 are the probabilities that the first sub, second sub, and third sub will
 play respectively.
 """
 
 
-def base_lp_model(players, teams, points, positions, prices, num_captains,
+def base_lp_model(players, teams, points, positions, num_captains,
                   sub_factors):
     model = pulp.LpProblem("Constrained value maximisaiton", pulp.LpMaximize)
     num_players = len(players)
