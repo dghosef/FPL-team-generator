@@ -7,9 +7,12 @@ Pandas
 ### Usage
 `python pick_team.py`
 ### TODO
-Transfers must have higher next gameweek score
-Friendlier team selection
-More fixtures with some sort of weighting
+Friendlier team selection function
+Weighting function
 Bonus points, save points
+Points for conceeding 2 goals, 4 goals
+Friendlier team transfers function
+Transfers must have higher next gameweek score
+pick starting xi for next gw along with captain, etc
 Handle injuries, doubts, and suspensions better in transfer/predict points
 Chip strategy

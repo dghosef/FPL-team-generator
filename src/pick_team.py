@@ -1,7 +1,20 @@
 # thanks to https://github.com/joconnor-ml/forecasting-fantasy-football
+import math
+
 from base_lp_model import base_lp_model
 from player import Player
 from predict_points import performance_predictions, team_strengths
+
+
+"""
+Given a predicted goal count(expected_goals), returns the probability that
+test_goals goals will be scored using the Poisson Distribution formula
+"""
+
+
+def goal_count_probability(expected_goals, test_goals):
+    return (expected_goals ** test_goals) * (math.e ** (-1 * expected_goals)) \
+        / math.factorial(test_goals)
 
 
 """
@@ -10,11 +23,12 @@ respective cumulative predicted points found by passing past_gameweeks,
 future_gameweeks, strengths, refresh_data, avg_scored, and avg_assisted
 into performance_predictions, a list of their respective positions, and a list
 of their respective prices in that order. Discard players who have played less
-minutes than min_mins and whose statuses aren't in good_status
+minutes than min_mins in the past num_gws gameweeks and whose statuses aren't
+in good_status
 """
 
 
-def get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
+def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
              refresh_data=False, avg_scored=1.36, avg_assisted=.75,
              good_status=['a']):
     player_data = performance_predictions(past_gameweeks, future_gameweeks,
@@ -26,9 +40,9 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
     positions = list()
     prices = list()
     for player in player_data:
-        if sum(player_data[player]['gw_history'][0]) < min_mins or \
+        if sum(player_data[player]['gw_history'][0][-num_gws:]) < min_mins or \
                 player_data[player]['status'] not in good_status:
-            continue
+            player_data[player]['points'] = [0]
         players.append(player)
         teams.append(player.team)
         points.append(
@@ -48,21 +62,21 @@ substitution decisions for each player, and captain decisions for each player.
 Does not select a backup gk
 
 Selected team will cost at most budget and each player will have played at
-least min_mins in past_gameweeks. sub_factors is a list containing the
+least min_mins in the last num_gws gws. sub_factors is a list containing the
 probabilities sub1, sub2, and sub3 will play respectively, num_captains is
 the expected number of players who the captaincy will be rotated between,
 if refresh_data is True, all data from the fpl api will be redownloaded.
 """
 
 
-def lp_team_select(past_gameweeks, future_gameweeks, budget=100, min_mins=4*60,
-                   refresh_data=False, sub_factors=[0.3, 0.2, 0.1],
-                   num_captains=1):
+def lp_team_select(past_gameweeks, future_gameweeks, weights=None, budget=96,
+                   min_mins=4*60, num_gws=4, refresh_data=False,
+                   sub_factors=[0.3, 0.2, 0.1], num_captains=2):
     strengths = \
-        team_strengths(future_gameweeks[0], len(past_gameweeks), refresh_data)
+        team_strengths(past_gameweeks, weights, refresh_data=refresh_data)
     players, teams, points, positions, prices =  \
         get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
-                 refresh_data=refresh_data)
+                 num_gws, refresh_data=refresh_data)
     num_players = len(players)
     model, starting_decisions, sub_1_decision, sub_2_decision, \
         sub_3_decision, captain_decisions = \
@@ -73,37 +87,29 @@ def lp_team_select(past_gameweeks, future_gameweeks, budget=100, min_mins=4*60,
                   + sub_3_decision[i]) * prices[i]
                  for i in range(num_players)) <= budget  # total cost
     model.solve()
-    print("Total expected score = {}".format(model.objective.value()))
     return players, starting_decisions, sub_1_decision, sub_2_decision, \
-        sub_3_decision, captain_decisions
+        sub_3_decision, captain_decisions, model.objective.value()
 
 
 """
 Given a current_team which is a list of 14 Player objects(exclude backup gk),
 a list of their current selling costs, a maximum number of transfers, and the
-amount of money in the bank(itb) suggests which players to remove.  Arguments
+amount of money in the bank(itb) suggests which players to remove. Arguments
 are largely the same as lp_team_select except itb replaces budget.
 """
 
 
 def lp_transfer(current_team, selling_prices, transfer_count, past_gameweeks,
-                future_gameweeks, itb=0, min_mins=5*60, refresh_data=False,
-                sub_factors=[0.3, 0.2, 0.1], num_captains=1):
+                future_gameweeks, weights=None, itb=0, min_mins=4*60,
+                num_gws=4, refresh_data=False, sub_factors=[0.3, 0.2, 0.1],
+                num_captains=1):
     budget = sum(selling_prices) + itb
     strengths = \
-        team_strengths(future_gameweeks[0], len(past_gameweeks), refresh_data)
+        team_strengths(past_gameweeks, weights, refresh_data=refresh_data)
     players, teams, points, positions, prices =  \
-        get_data(past_gameweeks, future_gameweeks, strengths, min_mins)
+        get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
+                 num_gws)
     num_players = len(players)
-    # If a player in current_team but not in our points predictions because of
-    # a lack of minutes/injury, add him with 0 points
-    for i in range(len(current_team)):
-        if not current_team[i] in players:
-            players.append(current_team[i])
-            prices.append(selling_prices[i])
-            points.append(0)
-            teams.append(current_team[i].team)
-            positions.append(current_team[i].position)
     # Change prices for players already in current_team because of the way
     # FPL handles players' selling prices after price rises.
     for i in range(num_players):
@@ -124,9 +130,35 @@ def lp_transfer(current_team, selling_prices, transfer_count, past_gameweeks,
                  for i in range(num_players) if players[i] in current_team) \
         >= len(current_team) - transfer_count
     model.solve()
-    print("Total expected score = {}".format(model.objective.value()))
     return players, starting_decisions, sub_1_decision, sub_2_decision, \
-        sub_3_decision, captain_decisions
+        sub_3_decision, captain_decisions, model.objective.value()
+
+
+def find_weights(size, factor, step_size):
+    return [factor ** (i // step_size) for i in range(size)]
+
+
+def pick_team(cur_gw, past_gws=9, future_gws=10, budget=96, min_mins=270,
+              num_gws=4, refresh_data=False, sub_factors=[.2, .1, .05],
+              num_captains=2):
+    if cur_gw < past_gws:
+        past_gws = cur_gw - 1
+    players, starting, sub1, sub2, sub3, captain = \
+        lp_team_select(range(cur_gw - past_gws, cur_gw),
+                       range(cur_gw, cur_gw+future_gws),
+                       weights=find_weights(past_gws, 3/2, 3), budget=budget,
+                       min_mins=min_mins, num_gws=num_gws,
+                       refresh_data=refresh_data, sub_factors=sub_factors,
+                       num_captains=num_captains)
+    starting_xi = [players[i] for i in range(len(players)) if
+                   starting[i].value() != 0]
+    subs = list()
+    for sub in (sub1, sub2, sub3):
+        subs += [players[i] for i in range(len(players))
+                 if sub[i].value() != 0]
+    captains = [players[i] for i in range(len(players)) if
+                captain[i].value() != 0]
+    return starting_xi, subs, captains
 
 
 def print_xi(xi):
@@ -157,7 +189,7 @@ if __name__ == "__main__":
 
     players, starting, sub1, sub2, sub3, captain = \
         lp_transfer(current_team, prices, 2, [11, 12, 13, 14, 15],
-                    range(16, 26), num_captains=2, itb=.2)
+                    range(16, 26), None, num_captains=2, itb=.2)
     print(list(players[i] for i in range(len(players)) if
           starting[i].value() != 0))
     for sub in (sub1, sub2, sub3):
@@ -165,14 +197,4 @@ if __name__ == "__main__":
                    if sub[i].value() != 0))
     print(list(players[i] for i in range(len(players)) if
           captain[i].value() != 0))
-
-    players, starting, sub1, sub2, sub3, captain = \
-        lp_team_select(range(7, 17), range(17, 27), num_captains=2,
-                       min_mins=760, budget=96, refresh_data=False)
-    print_xi([players[i] for i in range(len(players)) if
-              starting[i].value() != 0])
-    for sub in (sub1, sub2, sub3):
-        print(list(players[i] for i in range(len(players))
-                   if sub[i].value() != 0))
-    print(list(players[i] for i in range(len(players)) if
-          captain[i].value() != 0))
+    print(pick_team(5))

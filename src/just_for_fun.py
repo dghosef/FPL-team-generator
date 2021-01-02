@@ -1,17 +1,6 @@
-import math
 import itertools
+from pick_team import goal_count_probability
 from predict_points import predict_score
-
-
-"""
-Given a predicted goal count(expected_goals), returns the probability that
-test_goals goals will be scored using the Poisson Distribution formula
-"""
-
-
-def goal_count_probability(expected_goals, test_goals):
-    return (expected_goals ** test_goals) * (math.e ** (-1 * expected_goals)) \
-        / math.factorial(test_goals)
 
 
 """
