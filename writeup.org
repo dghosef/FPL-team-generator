@@ -243,6 +243,7 @@
 	 - When calculating creativity and threat influences for each player, the algorithm doesn't take into account the difficulty of the teams that player played.
 	   - For example, if Lingard creates a bunch of chances vs WBA and then gets benched for the hard games, he would have an unfairly high creativity influence.
 	   - Could be fixed by comparing each player's creativity per minute to his team's cpm only in the games he was involved in.
+
      - The bonus point algorithm doesn't account for bps magnets/repellants. It also assumes bonus points scales linearly with bps which isn't that accurate.
 	 - There's probably a better way to guess who is going to start and or maybe estimate a probability of each player starting.
 	 - It probably wouldn't take too much effort to modify the team selection to make an anti-fantasy-premier-league team which would be an interesting experiment
