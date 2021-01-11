@@ -25,7 +25,7 @@ if __name__ == "__main__":
         # should be in the same order as the players in current_team
         prices = [4.9, 4.5, 5.8, 5.5, 4.7, 4.1, 7.6, 12.4, 11.0, 4.4, 9.3,
                 6.3, 6.0, 10.7]
-        # Change cur_gw to the current gameweek in fpl.
+        # Change cur_gw to the gameweek that is about to come.
         # Change transfer_count to the max number of transfers
         # Change itb to the amount of remaining money in the bank
         # If you want to regrab data from the FPL api, set refresh_data to True
