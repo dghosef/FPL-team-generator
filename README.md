@@ -5,7 +5,7 @@ Python >= 3.6
 PuLP
 Pandas
 ### Usage
-`python pick_team.py`
+Edit the src/main.py file to your liking(basic instructions in the file). Then run `python src/main.py` a team should be outputted.
 ### TODO
 Chip strategy
 Tune weights

@@ -184,7 +184,7 @@ num_captains - number of estimated players to share the armband
 """
 
 
-def pick_team(cur_gw, past_gws=9, future_gws=10, budget=96, min_mins=240,
+def pick_team(cur_gw, past_gws=10, future_gws=10, budget=96, min_mins=240,
               num_gws=4, refresh_data=False, sub_factors=[.2, .1, .05],
               num_captains=2, weights=None, hivemind=False):
     if cur_gw <= past_gws:

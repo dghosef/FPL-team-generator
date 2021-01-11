@@ -36,6 +36,8 @@ creativity, threat, and saves are their respective values of each gameweek
 
 def get_gw_history(gameweeks, refresh_data=False):
     gameweek_dict = dict()
+    if not os.path.exists('./data/gameweeks'):
+        os.makedirs('./data/gameweeks')
     for gameweek in gameweeks:
         if os.path.isfile(f'./data/gameweeks/{gameweek}') and \
                 not refresh_data:

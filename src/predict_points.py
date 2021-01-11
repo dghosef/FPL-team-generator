@@ -69,10 +69,9 @@ def team_strengths(gameweeks, weights=None, refresh_data=False,
                 [sum(defensive_strengths) / sum(weights),
                  sum(offensive_strengths) / sum(weights)]
         strengths = new_strengths
-        # Frees up memory. Without this, program slows with more iterations
+        # Without this, program slows with more iterations
         del new_strengths
-        # Once initial iterations are finished, start taking average of new
-        # iterations
+        # Our return value is the average of num_samples iterations
         if iterations <= 0:
             for team in strengths:
                 avg_strengths[team] = \
