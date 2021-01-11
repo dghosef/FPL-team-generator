@@ -1,8 +1,7 @@
 # coding=UTF-8
-from pick_team import pick_team
+from pick_team import pick_team, transfer
 from player import Player
 if __name__ == "__main__":
-    # 
     mode = 'pick'
     if mode == 'transfer':
         # Update this to your current team. Don't include backup gk
@@ -29,15 +28,13 @@ if __name__ == "__main__":
         # Change cur_gw to the current gameweek in fpl.
         # Change transfer_count to the max number of transfers
         # Change itb to the amount of remaining money in the bank
-        # If you want to make decisions based on player popularity
-        # change hivemind to True
         # If you want to regrab data from the FPL api, set refresh_data to True
         transfer(cur_gw=17, team=current_team, prices=prices, transfer_count=1,
-                 itb=0.0, hivemind=True, refresh_data=False)
+                 itb=0.0, refresh_data=False)
     elif mode == 'pick':
         # See above for parameter explanation. Only difference is budget, which
         # is the amount of money you have for your team. Does not pick a
         # backup gk, so subtract the backup gk cost from your budget
-        pick_team(cur_gw=18, budget=96, hivemind=False, refresh_data=False)
+        pick_team(cur_gw=18, budget=96, refresh_data=False)
     else:
         print("Set mode to either 'transfer' or 'pick'")

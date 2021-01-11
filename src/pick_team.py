@@ -32,11 +32,12 @@ in good_status.
 
 def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
              refresh_data=False, avg_scored=1.36, avg_assisted=.75,
-             good_status=['a'], hivemind=False):
+             good_status=['a']):
     player_data = performance_predictions(past_gameweeks, future_gameweeks,
                                           strengths, refresh_data, avg_scored,
                                           avg_assisted)
     future_fixtures = get_future_fixtures([future_gameweeks[0]])
+    # List of teams with blank gameweeks and double gameweeks next week
     bgw = [i for i in get_team_numbers().values()
            if i not in future_fixtures]
     dgw = [i for i in future_fixtures if len(future_fixtures[i]) == 2]
@@ -47,8 +48,10 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
     prices = list()
     next_week = list()
     for player in player_data:
+        # Give players who aren't starters 0 points
         if sum(player_data[player]['gw_history'][0][-num_gws:]) < min_mins:
             player_data[player]['points'] = [0] * len(future_gameweeks)
+        # Handle injured/doubt players
         elif player_data[player]['status'] not in good_status:
             news = player_data[player]['news']
             if re.search('75%', news):
@@ -67,13 +70,10 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
                 player_data[player]['points'] = [0] * len(future_gameweeks)
         players.append(player)
         teams.append(player.team)
-        if hivemind:
-            points.append(player_data[player]['selected_by'])
-        else:
-            points.append(
-                sum(player_data[player]['points']))
+        points.append(sum(player_data[player]['points']))
         prices.append(player_data[player]['price'])
         positions.append(player.position)
+        # Find predicted points for next week.
         if player.team not in bgw:
             if player.team in dgw:
                 next_week.append(player_data[player]['points'][0] +
@@ -104,13 +104,12 @@ if refresh_data is True, all data from the fpl api will be redownloaded.
 
 def lp_team_select(past_gameweeks, future_gameweeks, weights=None, budget=96,
                    min_mins=4*60, num_gws=4, refresh_data=False,
-                   sub_factors=[0.3, 0.2, 0.1], num_captains=2,
-                   hivemind=False):
+                   sub_factors=[0.3, 0.2, 0.1], num_captains=2):
     strengths = \
         team_strengths(past_gameweeks, weights, refresh_data=refresh_data)
     players, teams, points, positions, prices, next_week =  \
         get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
-                 num_gws, refresh_data=refresh_data, hivemind=hivemind)
+                 num_gws, refresh_data=refresh_data)
     num_players = len(players)
     model, starting_decisions, sub_1_decision, sub_2_decision, \
         sub_3_decision, captain_decisions = \
@@ -136,13 +135,13 @@ Arguments are largely the same as lp_team_select except itb replaces budget.
 def lp_transfer(current_team, selling_prices, transfer_count, past_gameweeks,
                 future_gameweeks, weights=None, itb=0, min_mins=4*60,
                 num_gws=4, refresh_data=False, sub_factors=[0.3, 0.2, 0.1],
-                num_captains=1, hivemind=False):
+                num_captains=1):
     budget = sum(selling_prices) + itb
     strengths = \
         team_strengths(past_gameweeks, weights, refresh_data=refresh_data)
     players, teams, points, positions, prices, next_week =  \
         get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
-                 num_gws, hivemind=hivemind)
+                 num_gws)
     num_players = len(players)
     # Change prices for players already in current_team because of the way
     # FPL handles players' selling prices after price rises.
@@ -186,7 +185,7 @@ num_captains - number of estimated players to share the armband
 
 def pick_team(cur_gw, past_gws=10, future_gws=10, budget=96, min_mins=240,
               num_gws=4, refresh_data=False, sub_factors=[.2, .1, .05],
-              num_captains=2, weights=None, hivemind=False):
+              num_captains=2, weights=None):
     if cur_gw <= past_gws:
         past_gws = cur_gw - 1
     if weights is None:
@@ -197,15 +196,13 @@ def pick_team(cur_gw, past_gws=10, future_gws=10, budget=96, min_mins=240,
                        weights=weights, budget=budget,
                        min_mins=min_mins, num_gws=num_gws,
                        refresh_data=refresh_data, sub_factors=sub_factors,
-                       num_captains=num_captains, hivemind=hivemind)
+                       num_captains=num_captains)
     next_week = [next_week[i] for i in range(len(players)) if
                  starting[i].value() != 0 or sub1[i].value() != 0 or
                  sub2[i].value() != 0 or sub3[i].value() != 0]
     players = [players[i] for i in range(len(players)) if
                starting[i].value() != 0 or sub1[i].value() != 0 or
                sub2[i].value() != 0 or sub3[i].value() != 0]
-    print(players)
-    print(next_week)
 
     starting_xi, subs, captains = pick_xi(players, next_week)
     print(f'gw {cur_gw} starters:')
@@ -230,8 +227,7 @@ The rest of the params are the same as pick_team
 
 def transfer(cur_gw, team, prices, transfer_count, past_gws=9, future_gws=10,
              itb=0, min_mins=240, num_gws=4, refresh_data=False,
-             sub_factors=[.2, .1, .05], num_captains=2, weights=None,
-             hivemind=False):
+             sub_factors=[.2, .1, .05], num_captains=2, weights=None):
     if weights is None:
         weights = find_weights(past_gws, 2, 5)
     players, starting, sub1, sub2, sub3, captain, next_week = \
@@ -241,7 +237,7 @@ def transfer(cur_gw, team, prices, transfer_count, past_gws=9, future_gws=10,
                     weights=weights, itb=itb,
                     min_mins=min_mins, num_gws=num_gws,
                     refresh_data=refresh_data, sub_factors=sub_factors,
-                    num_captains=num_captains, hivemind=hivemind)
+                    num_captains=num_captains)
     starting_xi = [players[i] for i in range(len(players)) if
                    starting[i].value() != 0]
     next_week_prev_team = [next_week[i] for i in range(len(players)) if
@@ -265,7 +261,7 @@ def transfer(cur_gw, team, prices, transfer_count, past_gws=9, future_gws=10,
     print('')
     print('Captains:')
     print(captains)
-    new_team = starting_xi + list(subs)
+    new_team = list(starting_xi) + list(subs)
     print('\n Buy:')
     print([i for i in new_team if i not in team])
     print('\n Sell:')

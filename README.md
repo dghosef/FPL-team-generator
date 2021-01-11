@@ -3,6 +3,7 @@
 ### Requirements
 Python >= 3.6
 PuLP
+requests
 Pandas
 ### Usage
 Edit the src/main.py file to your liking(basic instructions in the file). Then run `python src/main.py` a team should be outputted.

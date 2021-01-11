@@ -11,8 +11,7 @@ bps_values = {1: (12, 9, 12),
               4: (0, 9, 24)}
 
 
-# Player class that stores a player's name, position, and team name. Every
-# EPL player as of Jan 1 2021 has a unique player object
+# Player class that stores a player's name, position, and team name.
 class Player():
     def __init__(self, name, position, team):
         self.name = name

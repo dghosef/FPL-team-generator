@@ -164,9 +164,11 @@ def performance_predictions(past_gameweeks, future_gameweeks, strengths,
             # creativity of player compared to creativity of team
             creativity_influence = \
                 creativity_per_90 / creativities[player.team]
+            # ditto with threat
             threat_influence = threat_per_90 / threats[player.team]
             if player.team not in future_fixtures:
                 future_fixtures[player.team] = []
+            # Predict the score of each game and each gk's number of saves
             predicted_scores = \
                 [predict_score(player.team, i, strengths, avg_scored)
                  for i in future_fixtures[player.team]]
@@ -174,6 +176,7 @@ def performance_predictions(past_gameweeks, future_gameweeks, strengths,
                                   history[player]['gw_history'][3],
                                   history[player]['gw_history'][0],
                                   player.team)
+            # Predict points from above data
             assists = list()
             goals = list()
             cleansheets = list()
@@ -194,10 +197,3 @@ def performance_predictions(past_gameweeks, future_gameweeks, strengths,
         history[player]['saves'] = saves
         history[player]['points'] = points
     return history
-
-
-if __name__ == "__main__":
-    strengths = team_strengths([11, 12, 13, 14, 15])
-    past_fixtures = get_past_fixtures(15)
-    future_fixtures = get_future_fixtures(range(19, 30))
-    past_saves = [10] * 14
