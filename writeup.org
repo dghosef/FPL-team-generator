@@ -249,7 +249,7 @@
 	 - I also plan to modify the algorithm to build a hivemind team which tries to optimize the percent selected amount to build the most popular team(I'm sure some has already done this though) as a comparison
      - Probably a lot more that I didn't think of or meant to remember but forgot(I had a lot of moments where I was like "oh I can improve xyz" while working on this that I'm sure I forgot)
        
- If you want to track my progress, I have an fpl team [[https://www.fantasy.premierleague.con/entry/7742703][here]] that I plan
+ If you want to track my progress, I have an fpl team(team id 7742703) that I plan
 to keep updating with the algorithm's choices as the season passes. It
 currently is on negative points because I took a lot of hits while
 experimenting. My hope is to iron out the kinks for next season.  I
