@@ -48,6 +48,9 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
     prices = list()
     next_week = list()
     for player in player_data:
+        # Sometimes the FPL api isn't caught up so manually enter in injuries
+        if player.name == "De Bruyne":
+            player_data[player]['points'] = [0] * len(future_gameweeks)
         # Give players who aren't starters 0 points
         if sum(player_data[player]['gw_history'][0][-num_gws:]) < min_mins:
             player_data[player]['points'] = [0] * len(future_gameweeks)
@@ -245,9 +248,9 @@ def transfer(cur_gw, team, prices, transfer_count, past_gws=9, future_gws=10,
     next_week = [next_week[i] for i in range(len(players)) if
                  starting[i].value() != 0 or sub1[i].value() != 0 or
                  sub2[i].value() != 0 or sub3[i].value() != 0]
-    # Save a transfer if our team is going to perform worse next week
-    if sum(next_week_prev_team) < sum(next_week):
-        next_week = next_week_prev_team
+    n_week = [players[i] for i in range(len(players)) if
+                 starting[i].value() != 0 or sub1[i].value() != 0 or
+                 sub2[i].value() != 0 or sub3[i].value() != 0]
     players = [players[i] for i in range(len(players)) if
                starting[i].value() != 0 or sub1[i].value() != 0 or
                sub2[i].value() != 0 or sub3[i].value() != 0]
