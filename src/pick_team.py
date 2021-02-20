@@ -48,9 +48,6 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
     prices = list()
     next_week = list()
     for player in player_data:
-        # Sometimes the FPL api isn't caught up so manually enter in injuries
-        if player.name == "De Bruyne":
-            player_data[player]['points'] = [0] * len(future_gameweeks)
         # Give players who aren't starters 0 points
         if sum(player_data[player]['gw_history'][0][-num_gws:]) < min_mins:
             player_data[player]['points'] = [0] * len(future_gameweeks)
@@ -71,6 +68,8 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
                 player_data[player]['points'][1] *= 0.5
             else:
                 player_data[player]['points'] = [0] * len(future_gameweeks)
+            # Temporary - just set each doubtful player to 0. Remove after finetuning above
+            player_data[player]['points'] = [0] * len(future_gameweeks)
         players.append(player)
         teams.append(player.team)
         points.append(sum(player_data[player]['points']))
