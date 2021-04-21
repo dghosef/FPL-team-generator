@@ -39,6 +39,9 @@ def get_gw_history(gameweeks, refresh_data=False):
     if not os.path.exists('./data/gameweeks'):
         os.makedirs('./data/gameweeks')
     for gameweek in gameweeks:
+        if(gameweek > 38):
+            print(f"Attempted to access gameweek {gameweek} which is too late")
+            continue
         if os.path.isfile(f'./data/gameweeks/{gameweek}') and \
                 not refresh_data:
             gameweek_df = pd.read_pickle(f'./data/gameweeks/{gameweek}')
@@ -166,6 +169,9 @@ def get_future_fixtures(gameweeks, refresh_data=False):
     if not os.path.exists('./data/future_fixtures'):
         os.makedirs('./data/future_fixtures')
     for gameweek in gameweeks:
+        if(gameweek > 38):
+            print(f"Attempted to access gameweek {gameweek} which is too late")
+            continue
         if refresh_data or not \
                 os.path.exists(f'./data/future_fixtures/{gameweek}'):
             print(f"grabbing data for gameweek {gameweek}")

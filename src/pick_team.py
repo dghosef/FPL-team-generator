@@ -3,7 +3,6 @@ import math
 import re
 
 from base_lp_model import base_lp_model
-from player import Player
 from predict_points import performance_predictions, team_strengths
 from fpl_api import get_future_fixtures, get_team_numbers
 
@@ -32,7 +31,7 @@ in good_status.
 
 def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
              refresh_data=False, avg_scored=1.36, avg_assisted=.75,
-             good_status=['a']):
+             good_status=['a'], blacklisted=[]):
     player_data = performance_predictions(past_gameweeks, future_gameweeks,
                                           strengths, refresh_data, avg_scored,
                                           avg_assisted)
@@ -54,6 +53,7 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
         # Handle injured/doubt players
         elif player_data[player]['status'] not in good_status:
             news = player_data[player]['news']
+            player_data[player]['points'] += [0, 0, 0] # Append points if player has bgw
             if re.search('75%', news):
                 player_data[player]['points'][0] *= .75
             elif re.search('50%', news):
@@ -68,8 +68,8 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
                 player_data[player]['points'][1] *= 0.5
             else:
                 player_data[player]['points'] = [0] * len(future_gameweeks)
-            # Temporary - just set each doubtful player to 0. Remove after finetuning above
-            player_data[player]['points'] = [0] * len(future_gameweeks)
+                player_data[player]['points'] = [0] * len(future_gameweeks)
+            player_data[player]['points'] = [0] * len(future_gameweeks) # Fix this later
         players.append(player)
         teams.append(player.team)
         points.append(sum(player_data[player]['points']))
@@ -84,6 +84,8 @@ def get_data(past_gameweeks, future_gameweeks, strengths, min_mins, num_gws,
                 next_week.append(player_data[player]['points'][0])
         else:
             next_week.append(0)
+        if player in blacklisted:
+            points[-1] = 0
     return players, teams, points, positions, prices, next_week
 
 
@@ -106,12 +108,12 @@ if refresh_data is True, all data from the fpl api will be redownloaded.
 
 def lp_team_select(past_gameweeks, future_gameweeks, weights=None, budget=96,
                    min_mins=4*60, num_gws=4, refresh_data=False,
-                   sub_factors=[0.3, 0.2, 0.1], num_captains=2):
+                   sub_factors=[0.3, 0.2, 0.1], num_captains=2, blacklisted=[]):
     strengths = \
         team_strengths(past_gameweeks, weights, refresh_data=refresh_data)
     players, teams, points, positions, prices, next_week =  \
         get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
-                 num_gws, refresh_data=refresh_data)
+                 num_gws, refresh_data=refresh_data, blacklisted=blacklisted)
     num_players = len(players)
     model, starting_decisions, sub_1_decision, sub_2_decision, \
         sub_3_decision, captain_decisions = \
@@ -137,13 +139,13 @@ Arguments are largely the same as lp_team_select except itb replaces budget.
 def lp_transfer(current_team, selling_prices, transfer_count, past_gameweeks,
                 future_gameweeks, weights=None, itb=0, min_mins=4*60,
                 num_gws=4, refresh_data=False, sub_factors=[0.3, 0.2, 0.1],
-                num_captains=1):
+                num_captains=1, blacklisted=[]):
     budget = sum(selling_prices) + itb
     strengths = \
         team_strengths(past_gameweeks, weights, refresh_data=refresh_data)
     players, teams, points, positions, prices, next_week =  \
         get_data(past_gameweeks, future_gameweeks, strengths, min_mins,
-                 num_gws)
+                 num_gws, blacklisted=blacklisted)
     num_players = len(players)
     # Change prices for players already in current_team because of the way
     # FPL handles players' selling prices after price rises.
@@ -187,7 +189,7 @@ num_captains - number of estimated players to share the armband
 
 def pick_team(cur_gw, past_gws=10, future_gws=10, budget=96, min_mins=240,
               num_gws=4, refresh_data=False, sub_factors=[.2, .1, .05],
-              num_captains=2, weights=None):
+              num_captains=2, weights=None, blacklisted=[]):
     if cur_gw <= past_gws:
         past_gws = cur_gw - 1
     if weights is None:
@@ -198,7 +200,7 @@ def pick_team(cur_gw, past_gws=10, future_gws=10, budget=96, min_mins=240,
                        weights=weights, budget=budget,
                        min_mins=min_mins, num_gws=num_gws,
                        refresh_data=refresh_data, sub_factors=sub_factors,
-                       num_captains=num_captains)
+                       num_captains=num_captains, blacklisted=blacklisted)
     next_week = [next_week[i] for i in range(len(players)) if
                  starting[i].value() != 0 or sub1[i].value() != 0 or
                  sub2[i].value() != 0 or sub3[i].value() != 0]
@@ -229,7 +231,7 @@ The rest of the params are the same as pick_team
 
 def transfer(cur_gw, team, prices, transfer_count, past_gws=9, future_gws=10,
              itb=0, min_mins=240, num_gws=4, refresh_data=False,
-             sub_factors=[.2, .1, .05], num_captains=2, weights=None):
+             sub_factors=[.2, .1, .05], num_captains=2, weights=None, blacklisted=[]):
     if weights is None:
         weights = find_weights(past_gws, 2, 5)
     players, starting, sub1, sub2, sub3, captain, next_week = \
@@ -239,7 +241,7 @@ def transfer(cur_gw, team, prices, transfer_count, past_gws=9, future_gws=10,
                     weights=weights, itb=itb,
                     min_mins=min_mins, num_gws=num_gws,
                     refresh_data=refresh_data, sub_factors=sub_factors,
-                    num_captains=num_captains)
+                    num_captains=num_captains, blacklisted=blacklisted)
     starting_xi = [players[i] for i in range(len(players)) if
                    starting[i].value() != 0]
     next_week_prev_team = [next_week[i] for i in range(len(players)) if

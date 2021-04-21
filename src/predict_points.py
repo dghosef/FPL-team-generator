@@ -58,6 +58,8 @@ def team_strengths(gameweeks, weights=None, refresh_data=False,
                 opp_a_strength = strengths[game[0]][1]
                 # calculate defensive and offensive strengths. Cap them at 3
                 # to reduce influence of extreme outliers
+                if goals_conceeded is None:
+                    continue
                 defensive_strengths.append(
                     min(3, goals_conceeded / avg_scored / opp_a_strength) *
                     weights[i])
