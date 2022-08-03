@@ -1,7 +1,7 @@
 # Fantasy premier league team generation
 
 ### About
-Generates a Fantasy Premier League team with linear programming and a points prediction algorithm based on player statistics from the FPL API. See [dghosef.me/fpl-writeup](https://dghosef.github.io/fpl-writeup) for more details and a full writeup. 
+Generates a Fantasy Premier League team with linear programming and a points prediction algorithm based on player statistics from the FPL API. See [dghosef.github.io/fpl-writeup](https://dghosef.github.io/fpl-writeup) for more details and a full writeup. 
 
 ### Requirements
 Python >= 3.6 \
